@@ -149,6 +149,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     print("🚀 启动服务器...")
-    print("📱 WebSocket: ws://0.0.0.0:8086/ws")
-    print("🌐 控制台: http://0.0.0.0:8086")
-    uvicorn.run(app, host="0.0.0.0", port=8086)
+    print("📱 WebSocket: ws://0.0.0.0:8080/ws")
+    print("🌐 控制台: http://0.0.0.0:8080")
+    uvicorn.run(app, host="0.0.0.0", port=8080)
