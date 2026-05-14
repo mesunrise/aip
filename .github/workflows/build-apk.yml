@@ -22,18 +22,17 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
     
     - name: 设置Android SDK
       uses: android-actions/setup-android@v3
     
-    - name: 授予gradlew执行权限
-      run: chmod +x android-app/gradlew
+    - name: 设置Gradle
+      uses: gradle/actions/setup-gradle@v3
     
     - name: 构建Debug APK
       run: |
         cd android-app
-        ./gradlew assembleDebug --stacktrace
+        gradle assembleDebug --stacktrace
     
     - name: 上传Debug APK
       uses: actions/upload-artifact@v4
