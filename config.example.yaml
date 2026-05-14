@@ -1,0 +1,211 @@
+# Mobile AI Agent Configuration Example
+# 复制此文件为 config.yaml 并填入实际配置
+
+# AI模型配置
+ai_model:
+  # 主要提供商: openai, anthropic, google, qwen
+  provider: "openai"
+  
+  # OpenAI配置
+  openai:
+    api_key: "sk-your-openai-api-key"
+    model: "gpt-4-vision-preview"
+    base_url: "https://api.openai.com/v1"
+    max_tokens: 1000
+    temperature: 0.7
+  
+  # Anthropic配置
+  anthropic:
+    api_key: "sk-ant-your-anthropic-api-key"
+    model: "claude-3-opus-20240229"
+    max_tokens: 1000
+  
+  # Google配置
+  google:
+    api_key: "your-google-api-key"
+    model: "gemini-pro-vision"
+  
+  # 本地模型配置（如Qwen-VL）
+  local:
+    model_path: "./models/qwen-vl"
+    device: "cuda"  # cuda, cpu
+    precision: "fp16"  # fp32, fp16, int8
+
+# OCR配置
+ocr:
+  engine: "paddleocr"  # paddleocr, easyocr
+  languages: ["ch", "en"]
+  use_gpu: false
+
+# 设备配置
+device:
+  # 连接方式: adb, wifi, accessibility
+  connection_type: "adb"
+  
+  # ADB配置
+  adb:
+    host: "127.0.0.1"
+    port: 5037
+    timeout: 30
+    retry_times: 3
+  
+  # WiFi ADB配置
+  wifi_adb:
+    enabled: false
+    device_ip: "192.168.1.100"
+    device_port: 5555
+  
+  # 截图配置
+  screenshot:
+    quality: 80  # 1-100
+    format: "png"  # png, jpg
+    scale: 1.0  # 缩放比例
+
+# 任务执行配置
+execution:
+  # 最大执行步骤
+  max_steps: 50
+  
+  # 每步延迟（秒）
+  step_delay: 1.0
+  
+  # 操作超时（秒）
+  action_timeout: 10
+  
+  # 失败重试次数
+  max_retries: 3
+  
+  # 错误恢复策略
+  error_recovery:
+    enabled: true
+    strategies: ["retry", "fallback", "skip"]
+
+# 记忆配置
+memory:
+  # 启用记忆功能
+  enabled: true
+  
+  # 短期记忆容量
+  short_term_capacity: 100
+  
+  # 长期记忆存储
+  long_term_storage: "database"  # database, file
+  
+  # 学习开关
+  learning_enabled: true
+
+# 数据库配置
+database:
+  url: "postgresql://user:password@localhost:5432/mobile_ai_agent"
+  pool_size: 10
+  max_overflow: 20
+  echo: false
+
+# 缓存配置
+cache:
+  enabled: true
+  backend: "redis"  # redis, memory
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+    password: ""
+    ttl: 3600
+
+# 日志配置
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "json"  # json, text
+  file: "logs/agent.log"
+  rotation: "1 day"
+  retention: "30 days"
+  
+  # 各模块日志级别
+  modules:
+    core.planner: "DEBUG"
+    core.vision: "INFO"
+    core.executor: "INFO"
+    models: "INFO"
+
+# API服务配置
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: false
+  workers: 4
+  
+  # CORS配置
+  cors:
+    enabled: true
+    origins: ["*"]
+    methods: ["*"]
+    headers: ["*"]
+  
+  # 认证配置
+  auth:
+    enabled: true
+    secret_key: "your-secret-key-change-this"
+    algorithm: "HS256"
+    access_token_expire_minutes: 30
+
+# 安全配置
+security:
+  # 截图脱敏
+  screenshot_sanitization:
+    enabled: true
+    sensitive_patterns:
+      - "password"
+      - "bank_card"
+      - "id_card"
+  
+  # 操作审计
+  audit_logging:
+    enabled: true
+    log_file: "logs/audit.log"
+  
+  # 数据加密
+  encryption:
+    enabled: true
+    algorithm: "AES-256"
+
+# 性能配置
+performance:
+  # 并发控制
+  max_concurrent_tasks: 5
+  max_concurrent_devices: 10
+  
+  # 资源限制
+  max_memory_mb: 4096
+  max_cpu_percent: 80
+  
+  # 缓存策略
+  cache_screen_analysis: true
+  cache_app_knowledge: true
+
+# 监控配置
+monitoring:
+  enabled: true
+  
+  # Prometheus
+  prometheus:
+    enabled: true
+    port: 9090
+  
+  # 告警配置
+  alerts:
+    enabled: true
+    channels: ["email", "webhook"]
+    email:
+      smtp_host: "smtp.gmail.com"
+      smtp_port: 587
+      from_addr: "alerts@example.com"
+      to_addrs: ["admin@example.com"]
+    webhook:
+      url: "https://your-webhook-url.com"
+
+# 开发配置
+development:
+  debug: false
+  mock_devices: false
+  save_screenshots: true
+  screenshot_dir: "screenshots"
