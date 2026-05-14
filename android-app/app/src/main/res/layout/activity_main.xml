@@ -8,7 +8,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="抖音自动化 v0.1"
+        android:text="Phone自动化 v0.1"
         android:textSize="24sp"
         android:textStyle="bold"
         android:gravity="center"
@@ -26,7 +26,7 @@
         android:id="@+id/serverUrlInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="服务器地址"
+        android:hint="服务器地址 (如: ws://192.168.1.100:8000/ws)"
         android:inputType="textUri"
         android:layout_marginBottom="8dp" />
 
@@ -69,7 +69,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="日志:"
+        android:text="日志 (长按可复制):"
         android:textStyle="bold"
         android:layout_marginBottom="8dp" />
 
@@ -84,6 +84,7 @@
             android:layout_height="wrap_content"
             android:textSize="12sp"
             android:fontFamily="monospace"
+            android:textIsSelectable="true"
             android:text="" />
     </ScrollView>
 
