@@ -1,132 +1,154 @@
-"""
-抖音自动化云端服务器 - v0.1
-功能：WebSocket通信验证
-"""
-import uvicorn
+import asyncio
+import json
+from datetime import datetime
+from typing import Dict, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
-from datetime import datetime
-import json
+import uvicorn
 
-app = FastAPI(title="抖音自动化云端服务器", version="0.1")
+app = FastAPI(title="抖音自动化云端服务器")
 
-# 设备连接管理
-connected_devices = {}
-
+# 存储所有连接的设备
+connected_devices: Dict[str, WebSocket] = {}
+device_info: Dict[str, dict] = {}
 
 @app.get("/")
 async def root():
-    """首页 - 显示连接的设备"""
-    html = f"""
-    <html>
-        <head><title>抖音自动化控制台</title></head>
-        <body>
-            <h1>抖音自动化控制台 v0.1</h1>
-            <h2>在线设备: {len(connected_devices)}</h2>
-            <ul>
-                {''.join([f'<li>{device_id} - {info["connected_at"]}</li>' 
-                         for device_id, info in connected_devices.items()])}
-            </ul>
-            <hr>
-            <h3>测试消息发送</h3>
-            <input id="deviceId" placeholder="设备ID" />
-            <input id="message" placeholder="消息内容" />
-            <button onclick="sendMessage()">发送</button>
-            <script>
-                function sendMessage() {{
-                    const deviceId = document.getElementById('deviceId').value;
-                    const message = document.getElementById('message').value;
-                    fetch('/send/' + deviceId + '?message=' + message, {{method: 'POST'}})
-                        .then(r => r.json())
-                        .then(d => alert(JSON.stringify(d)));
-                }}
-            </script>
-        </body>
-    </html>
-    """
-    return HTMLResponse(content=html)
-
-
-@app.websocket("/ws/{device_id}")
-async def websocket_endpoint(websocket: WebSocket, device_id: str):
-    """WebSocket连接端点"""
-    await websocket.accept()
-    
-    # 注册设备
-    connected_devices[device_id] = {
-        "websocket": websocket,
-        "connected_at": datetime.now().isoformat()
+    """根路径 - 显示服务器状态"""
+    return {
+        "service": "抖音自动化云端服务器",
+        "version": "0.1.0",
+        "status": "running",
+        "connected_devices": len(connected_devices),
+        "devices": list(device_info.keys())
     }
-    print(f"✅ 设备连接: {device_id}")
-    
-    try:
-        while True:
-            # 接收消息
-            data = await websocket.receive_text()
-            message = json.loads(data)
-            
-            print(f"📨 收到消息 [{device_id}]: {message}")
-            
-            # 处理心跳
-            if message.get("type") == "heartbeat":
-                await websocket.send_text(json.dumps({
-                    "type": "heartbeat_ack",
-                    "timestamp": datetime.now().timestamp()
-                }))
-            
-            # 处理状态上报
-            elif message.get("type") == "status":
-                print(f"📊 设备状态 [{device_id}]: {message.get('data')}")
-                await websocket.send_text(json.dumps({
-                    "type": "status_ack",
-                    "message": "状态已收到"
-                }))
-            
-            # 回显其他消息
-            else:
-                await websocket.send_text(json.dumps({
-                    "type": "echo",
-                    "original": message
-                }))
-                
-    except WebSocketDisconnect:
-        print(f"❌ 设备断开: {device_id}")
-        del connected_devices[device_id]
-
-
-@app.post("/send/{device_id}")
-async def send_message(device_id: str, message: str):
-    """向指定设备发送消息"""
-    if device_id not in connected_devices:
-        return {"error": "设备未连接"}
-    
-    websocket = connected_devices[device_id]["websocket"]
-    await websocket.send_text(json.dumps({
-        "type": "command",
-        "message": message,
-        "timestamp": datetime.now().timestamp()
-    }))
-    
-    return {"success": True, "device_id": device_id, "message": message}
-
 
 @app.get("/devices")
-async def list_devices():
-    """列出所有连接的设备"""
+async def get_devices():
+    """获取所有连接的设备列表"""
     return {
         "count": len(connected_devices),
-        "devices": [
-            {
-                "device_id": device_id,
-                "connected_at": info["connected_at"]
-            }
-            for device_id, info in connected_devices.items()
-        ]
+        "devices": device_info
     }
 
+@app.get("/console")
+async def console():
+    """Web控制台"""
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>抖音自动化控制台</title>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; }
+            .device { border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 5px; }
+            .device h3 { margin: 0 0 10px 0; color: #0066cc; }
+            .status { color: #00aa00; font-weight: bold; }
+            button { padding: 5px 15px; margin: 5px; cursor: pointer; }
+        </style>
+    </head>
+    <body>
+        <h1>🚀 抖音自动化控制台</h1>
+        <div id="devices"></div>
+        <script>
+            async function loadDevices() {
+                const response = await fetch('/devices');
+                const data = await response.json();
+                const devicesDiv = document.getElementById('devices');
+                devicesDiv.innerHTML = '<h2>在线设备 (' + data.count + ')</h2>';
+                for (const [deviceId, info] of Object.entries(data.devices)) {
+                    devicesDiv.innerHTML += `
+                        <div class="device">
+                            <h3>📱 ${deviceId}</h3>
+                            <p><span class="status">● 在线</span></p>
+                            <p>连接时间: ${info.connected_at}</p>
+                        </div>
+                    `;
+                }
+            }
+            loadDevices();
+            setInterval(loadDevices, 5000);
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket连接端点"""
+    device_id = None
+    await websocket.accept()
+    
+    try:
+        # 等待设备发送注册消息
+        data = await websocket.receive_text()
+        message = json.loads(data)
+        
+        if message.get("type") == "register":
+            device_id = message.get("device_id", f"device_{len(connected_devices)}")
+            connected_devices[device_id] = websocket
+            device_info[device_id] = {
+                "connected_at": datetime.now().isoformat(),
+                "last_heartbeat": datetime.now().isoformat()
+            }
+            
+            print(f"✅ 设备已连接: {device_id}")
+            
+            # 发送连接成功消息
+            await websocket.send_text(json.dumps({
+                "type": "connected",
+                "device_id": device_id,
+                "message": "连接成功"
+            }))
+            
+            # 处理消息循环
+            while True:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                
+                if message.get("type") == "heartbeat":
+                    # 心跳响应
+                    device_info[device_id]["last_heartbeat"] = datetime.now().isoformat()
+                    await websocket.send_text(json.dumps({
+                        "type": "heartbeat_ack",
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                    print(f"💓 心跳: {device_id}")
+                    
+                elif message.get("type") == "message":
+                    # 处理普通消息
+                    content = message.get("content", "")
+                    print(f"📨 收到消息 [{device_id}]: {content}")
+                    
+                    # 回复消息
+                    await websocket.send_text(json.dumps({
+                        "type": "message",
+                        "content": f"服务器收到: {content}",
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                    
+                elif message.get("type") == "status":
+                    # 状态上报
+                    status = message.get("status", {})
+                    device_info[device_id].update(status)
+                    print(f"📊 状态更新 [{device_id}]: {status}")
+                    
+    except WebSocketDisconnect:
+        if device_id:
+            print(f"❌ 设备已断开: {device_id}")
+            connected_devices.pop(device_id, None)
+            device_info.pop(device_id, None)
+    except Exception as e:
+        print(f"⚠️ 错误: {e}")
+        if device_id:
+            connected_devices.pop(device_id, None)
+            device_info.pop(device_id, None)
 
 if __name__ == "__main__":
     print("🚀 启动服务器...")
-    print("📱 WebSocket: ws://localhost:8000/ws/{device_id}")
-    print("🌐 控制台: http://localhost:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("📱 WebSocket: ws://0.0.0.0:8086/ws")
+    print("🌐 控制台: http://0.0.0.0:8086")
+    uvicorn.run(app, host="0.0.0.0", port=8086)

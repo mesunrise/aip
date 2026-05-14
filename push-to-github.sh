@@ -24,7 +24,7 @@ if [ -z "$GITHUB_USER" ]; then
 fi
 
 # 仓库名称
-REPO_NAME="douyin-automation"
+REPO_NAME="aip"
 
 # 检查是否已初始化Git
 if [ ! -d ".git" ]; then
