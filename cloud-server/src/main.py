@@ -470,10 +470,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif message.get("type") == "start_task":
                     # App请求开始任务
                     print(f"🎯 [{device_id}] 请求开始任务")
+                    print(f"📋 当前任务队列: {len(scheduler.tasks)} 个任务")
                     next_task = scheduler.get_next_task()
                     if next_task:
+                        print(f"✅ 找到任务: {next_task.get('task_id')} - {next_task.get('task_name')}")
                         await scheduler.start_task(next_task, websocket)
                     else:
+                        print(f"⚠️ 没有待执行的任务")
                         await websocket.send_json({
                             "type": "no_task",
                             "message": "没有待执行的任务"
