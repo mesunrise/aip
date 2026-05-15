@@ -5,12 +5,23 @@ from typing import Dict, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 import uvicorn
+from task_scheduler import TaskScheduler
 
 app = FastAPI(title="抖音自动化云端服务器")
 
 # 存储所有连接的设备
 connected_devices: Dict[str, WebSocket] = {}
 device_info: Dict[str, dict] = {}
+
+# 任务调度器
+scheduler = TaskScheduler()
+
+# 启动时加载任务
+@app.on_event("startup")
+async def startup_event():
+    print("🚀 服务器启动中...")
+    scheduler.load_tasks_from_md("tasks/automation-tasks.md")
+    print("✅ 服务器启动完成")
 
 @app.get("/")
 async def root():
@@ -30,6 +41,25 @@ async def get_devices():
         "count": len(connected_devices),
         "devices": device_info
     }
+
+@app.get("/api/tasks/stats")
+async def get_task_stats():
+    """获取任务统计"""
+    return scheduler.get_stats()
+
+@app.get("/api/tasks/{task_id}")
+async def get_task_detail(task_id: str):
+    """获取任务详情"""
+    task = scheduler.get_task_detail(task_id)
+    if task:
+        return task
+    return {"error": "Task not found"}
+
+@app.post("/api/tasks/reload")
+async def reload_tasks():
+    """重新加载任务配置"""
+    scheduler.load_tasks_from_md("tasks/automation-tasks.md")
+    return {"message": "Tasks reloaded", "stats": scheduler.get_stats()}
 
 @app.get("/test")
 async def test_page():
@@ -389,6 +419,39 @@ async def websocket_endpoint(websocket: WebSocket):
                     status = message.get("status", {})
                     device_info[device_id].update(status)
                     print(f"📊 状态更新 [{device_id}]: {status}")
+                
+                elif message.get("type") == "start_task":
+                    # App请求开始任务
+                    print(f"🎯 [{device_id}] 请求开始任务")
+                    next_task = scheduler.get_next_task()
+                    if next_task:
+                        await scheduler.start_task(next_task, websocket)
+                    else:
+                        await websocket.send_json({
+                            "type": "no_task",
+                            "message": "没有待执行的任务"
+                        })
+                
+                elif message.get("type") == "step_result":
+                    # 步骤执行结果
+                    task_id = message.get("task_id")
+                    step_index = message.get("step_index")
+                    success = message.get("success", False)
+                    step_message = message.get("message", "")
+                    scheduler.handle_step_result(task_id, step_index, success, step_message)
+                
+                elif message.get("type") == "task_result":
+                    # 任务完成结果
+                    task_id = message.get("task_id")
+                    success = message.get("success", False)
+                    result = message.get("result", {})
+                    scheduler.handle_task_result(task_id, success, result)
+                    
+                    # 自动执行下一个任务
+                    next_task = scheduler.get_next_task()
+                    if next_task:
+                        await asyncio.sleep(5)  # 延迟5秒
+                        await scheduler.start_task(next_task, websocket)
                     
     except WebSocketDisconnect:
         if device_id:
