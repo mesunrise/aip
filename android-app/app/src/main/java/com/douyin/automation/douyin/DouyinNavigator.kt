@@ -163,31 +163,86 @@ class DouyinNavigator(
     suspend fun enterProfile(bloggerName: String): Boolean {
         Log.d(TAG, "👤 尝试进入博主主页: $bloggerName")
         
-        // 查找包含博主名称的元素
+        // 先打印当前界面的节点树，用于调试
+        Log.d(TAG, "========== 搜索结果界面节点树 ==========")
+        locator.printCurrentTree()
+        Log.d(TAG, "==========================================")
+        
+        // 策略1: 查找包含博主名称的元素
         val nodes = locator.findAllByText(bloggerName, exact = false)
         
         if (nodes.isEmpty()) {
-            Log.e(TAG, "❌ 未找到博主: $bloggerName")
-            return false
+            Log.e(TAG, "❌ 未找到博主名称: $bloggerName")
+            
+            // 策略2: 尝试点击第一个搜索结果
+            Log.d(TAG, "尝试点击第一个搜索结果...")
+            return clickFirstSearchResult()
         }
         
-        Log.d(TAG, "找到 ${nodes.size} 个匹配的元素")
+        Log.d(TAG, "找到 ${nodes.size} 个包含博主名称的元素")
         
-        // 点击第一个匹配的元素
-        for (node in nodes) {
+        // 点击每个匹配的元素
+        for ((index, node) in nodes.withIndex()) {
+            Log.d(TAG, "尝试点击第 ${index + 1} 个元素")
+            
+            // 打印节点信息
+            val text = AccessibilityHelper.getNodeText(node)
+            val desc = AccessibilityHelper.getNodeDescription(node)
+            val className = node.className
+            Log.d(TAG, "节点信息: text=$text, desc=$desc, class=$className")
+            
             if (AccessibilityHelper.clickNode(node)) {
-                Log.d(TAG, "✅ 已点击博主元素")
+                Log.d(TAG, "✅ 已点击元素")
                 delay(3000)
                 
                 // 验证是否进入主页
                 if (isOnProfilePage()) {
                     Log.d(TAG, "✅ 已进入博主主页")
                     return true
+                } else {
+                    Log.w(TAG, "⚠️ 点击后未进入主页，尝试返回")
+                    goBack()
+                    delay(1000)
                 }
             }
         }
         
         Log.e(TAG, "❌ 无法进入博主主页")
+        return false
+    }
+    
+    /**
+     * 点击第一个搜索结果
+     */
+    private suspend fun clickFirstSearchResult(): Boolean {
+        // 查找RecyclerView
+        val recyclerViews = locator.findByClassName("androidx.recyclerview.widget.RecyclerView", timeout = 2000)
+        
+        if (recyclerViews.isEmpty()) {
+            Log.e(TAG, "❌ 未找到搜索结果列表")
+            return false
+        }
+        
+        val recyclerView = recyclerViews.first()
+        Log.d(TAG, "找到搜索结果列表，子元素数量: ${recyclerView.childCount}")
+        
+        // 点击第一个子元素
+        if (recyclerView.childCount > 0) {
+            val firstItem = recyclerView.getChild(0)
+            if (firstItem != null) {
+                Log.d(TAG, "尝试点击第一个搜索结果")
+                if (AccessibilityHelper.clickNode(firstItem)) {
+                    Log.d(TAG, "✅ 已点击第一个搜索结果")
+                    delay(3000)
+                    
+                    if (isOnProfilePage()) {
+                        Log.d(TAG, "✅ 已进入博主主页")
+                        return true
+                    }
+                }
+            }
+        }
+        
         return false
     }
     
