@@ -16,7 +16,8 @@ class SearchBloggerTask(
     private val service: AutomationAccessibilityService,
     private val launcher: DouyinLauncher,
     private val navigator: DouyinNavigator,
-    private val logger: OperationLogger
+    private val logger: OperationLogger,
+    private val wsClient: WebSocketClient? = null
 ) {
     
     companion object {
@@ -125,7 +126,6 @@ class SearchBloggerTask(
      */
     private fun reportSuccess(bloggerName: String) {
         try {
-            val wsClient = WebSocketClient.getInstance()
             if (wsClient == null) {
                 Log.w(TAG, "WebSocket未连接，无法上报结果")
                 return
@@ -152,7 +152,6 @@ class SearchBloggerTask(
      */
     private fun reportFailure(bloggerName: String, error: String) {
         try {
-            val wsClient = WebSocketClient.getInstance()
             if (wsClient == null) {
                 Log.w(TAG, "WebSocket未连接，无法上报结果")
                 return

@@ -41,6 +41,14 @@ class AutomationAccessibilityService : AccessibilityService() {
     private lateinit var operationLogger: OperationLogger
     
     private var currentTask: SearchBloggerTask? = null
+    private var wsClient: com.douyin.automation.network.WebSocketClient? = null
+    
+    /**
+     * 设置WebSocket客户端
+     */
+    fun setWebSocketClient(client: com.douyin.automation.network.WebSocketClient?) {
+        wsClient = client
+    }
     
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -129,7 +137,8 @@ class AutomationAccessibilityService : AccessibilityService() {
                     service = this@AutomationAccessibilityService,
                     launcher = douyinLauncher,
                     navigator = douyinNavigator,
-                    logger = operationLogger
+                    logger = operationLogger,
+                    wsClient = wsClient
                 )
                 
                 // 执行任务
