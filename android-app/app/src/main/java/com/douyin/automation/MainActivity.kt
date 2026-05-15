@@ -375,13 +375,17 @@ class MainActivity : AppCompatActivity() {
         
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val serverUrl = serverUrlInput.text.toString()
-                    .replace("/ws", "")
-                    .replace("ws://", "http://")
-                    .replace("wss://", "https://")
+                val serverUrl = withContext(Dispatchers.Main) {
+                    serverUrlInput.text.toString()
+                        .replace("/ws", "")
+                        .replace("ws://", "http://")
+                        .replace("wss://", "https://")
+                }
                 
                 val apiUrl = "$serverUrl/api/apk/latest"
-                addLog("📡 请求: $apiUrl")
+                withContext(Dispatchers.Main) {
+                    addLog("📡 请求: $apiUrl")
+                }
                 
                 val url = URL(apiUrl)
                 val connection = url.openConnection()
@@ -466,14 +470,20 @@ class MainActivity : AppCompatActivity() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
                     if (id == downloadId) {
-                        addLog("✅ 下载完成")
+                        runOnUiThread {
+                            addLog("✅ 下载完成")
+                        }
                         unregisterReceiver(this)
                         installApk()
                     }
                 }
             }
             
-            registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+            }
             
         } catch (e: Exception) {
             addLog("❌ 下载失败: ${e.message}")
