@@ -25,7 +25,7 @@ scheduler = TaskScheduler()
 @app.on_event("startup")
 async def startup_event():
     print("🚀 服务器启动中...")
-    scheduler.load_tasks_from_md("tasks/automation-tasks.md")
+    scheduler.load_tasks_from_md("../tasks/automation-tasks.md")
     print("✅ 服务器启动完成")
 
 @app.get("/")
@@ -63,7 +63,7 @@ async def get_task_detail(task_id: str):
 @app.post("/api/tasks/reload")
 async def reload_tasks():
     """重新加载任务配置"""
-    scheduler.load_tasks_from_md("tasks/automation-tasks.md")
+    scheduler.load_tasks_from_md("../tasks/automation-tasks.md")
     return {"message": "Tasks reloaded", "stats": scheduler.get_stats()}
 
 @app.get("/api/apk/latest")
