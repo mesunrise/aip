@@ -100,7 +100,9 @@ class MainActivity : AppCompatActivity() {
         
         // 检查更新按钮
         updateBtn.setOnClickListener {
-            checkUpdate()
+            addLog("⚠️ 更新功能开发中")
+            addLog("📥 请从GitHub下载最新版本")
+            addLog("🔗 https://github.com/mesunrise/aip/actions")
         }
         
         // 测试搜索按钮
@@ -367,166 +369,8 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
     
-    /**
-     * 检查更新
-     */
-    private fun checkUpdate() {
-        addLog("🔍 检查更新...")
-        
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val serverUrl = withContext(Dispatchers.Main) {
-                    serverUrlInput.text.toString()
-                        .replace("/ws", "")
-                        .replace("ws://", "http://")
-                        .replace("wss://", "https://")
-                }
-                
-                val apiUrl = "$serverUrl/api/apk/latest"
-                withContext(Dispatchers.Main) {
-                    addLog("📡 请求: $apiUrl")
-                }
-                
-                val url = URL(apiUrl)
-                val connection = url.openConnection()
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                
-                val response = connection.getInputStream().bufferedReader().readText()
-                val json = JSONObject(response)
-                
-                val filename = json.optString("filename", "unknown")
-                val sizeMb = json.optDouble("size_mb", 0.0)
-                val downloadUrl = json.optString("download_url", "")
-                
-                withContext(Dispatchers.Main) {
-                    addLog("✅ 找到新版本")
-                    addLog("📦 文件: $filename")
-                    addLog("📊 大小: ${sizeMb}MB")
-                    
-                    // 显示更新对话框
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle("发现新版本")
-                        .setMessage("文件: $filename\n大小: ${sizeMb}MB\n\n是否立即更新？")
-                        .setPositiveButton("立即更新") { _, _ ->
-                            downloadApk(downloadUrl)
-                        }
-                        .setNegativeButton("稍后", null)
-                        .show()
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    addLog("❌ 检查更新失败: ${e.message}")
-                }
-            }
-        }
-    }
-    
-    /**
-     * 下载APK
-     */
-    private fun downloadApk(downloadUrl: String) {
-        addLog("📥 开始下载APK...")
-        
-        try {
-            // 检查安装权限
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (!packageManager.canRequestPackageInstalls()) {
-                    addLog("⚠️ 需要安装权限")
-                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                    intent.data = Uri.parse("package:$packageName")
-                    startActivity(intent)
-                    return
-                }
-            }
-            
-            val serverUrl = serverUrlInput.text.toString()
-                .replace("/ws", "")
-                .replace("ws://", "http://")
-                .replace("wss://", "https://")
-            
-            val fullUrl = if (downloadUrl.startsWith("http")) {
-                downloadUrl
-            } else {
-                "$serverUrl$downloadUrl"
-            }
-            
-            addLog("📡 下载地址: $fullUrl")
-            
-            val request = DownloadManager.Request(Uri.parse(fullUrl))
-            request.setTitle("Phone自动化更新")
-            request.setDescription("正在下载最新版本...")
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "app-debug.apk")
-            
-            val downloadManager = getSystemService(DOWNLOAD_MANAGER_SERVICE) as DownloadManager
-            val downloadId = downloadManager.enqueue(request)
-            
-            addLog("✅ 下载已开始 (ID: $downloadId)")
-            addLog("📂 保存位置: Download/app-debug.apk")
-            
-            // 监听下载完成
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-                    if (id == downloadId) {
-                        runOnUiThread {
-                            addLog("✅ 下载完成")
-                        }
-                        unregisterReceiver(this)
-                        installApk()
-                    }
-                }
-            }
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
-            }
-            
-        } catch (e: Exception) {
-            addLog("❌ 下载失败: ${e.message}")
-        }
-    }
-    
-    /**
-     * 安装APK
-     */
-    private fun installApk() {
-        try {
-            val apkFile = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "app-debug.apk")
-            
-            if (!apkFile.exists()) {
-                addLog("❌ APK文件不存在")
-                return
-            }
-            
-            addLog("📦 安装APK...")
-            
-            val intent = Intent(Intent.ACTION_VIEW)
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                val apkUri = FileProvider.getUriForFile(
-                    this,
-                    "$packageName.fileprovider",
-                    apkFile
-                )
-                intent.setDataAndType(apkUri, "application/vnd.android.package-archive")
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } else {
-                intent.setDataAndType(Uri.fromFile(apkFile), "application/vnd.android.package-archive")
-            }
-            
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
-            
-            addLog("✅ 已跳转到安装界面")
-            
-        } catch (e: Exception) {
-            addLog("❌ 安装失败: ${e.message}")
-        }
-    }
+    // 更新功能暂时禁用，避免编译错误
+    // TODO: 后续优化更新功能
     
     /**
      * 检查并请求无障碍权限
