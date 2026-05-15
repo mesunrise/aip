@@ -50,6 +50,7 @@ class MainActivity : AppCompatActivity() {
         val sendBtn = findViewById<Button>(R.id.sendBtn)
         val messageInput = findViewById<EditText>(R.id.messageInput)
         val checkAccessibilityBtn = findViewById<Button>(R.id.checkAccessibilityBtn)
+        val startTaskBtn = findViewById<Button>(R.id.startTaskBtn)
         val testSearchBtn = findViewById<Button>(R.id.testSearchBtn)
         
         // 默认服务器地址
@@ -80,6 +81,11 @@ class MainActivity : AppCompatActivity() {
         // 检查无障碍权限按钮
         checkAccessibilityBtn.setOnClickListener {
             checkAndRequestAccessibility()
+        }
+        
+        // 开始任务按钮
+        startTaskBtn.setOnClickListener {
+            startTask()
         }
         
         // 测试搜索按钮
@@ -153,6 +159,26 @@ class MainActivity : AppCompatActivity() {
             val type = json.optString("type", "")
             
             when (type) {
+                "task_start" -> {
+                    val taskId = json.optString("task_id", "")
+                    val taskName = json.optString("task_name", "")
+                    val totalSteps = json.optInt("total_steps", 0)
+                    addLog("🎯 开始任务: $taskName (ID: $taskId)")
+                    addLog("📝 共 $totalSteps 个步骤")
+                }
+                
+                "step" -> {
+                    val taskId = json.optString("task_id", "")
+                    val stepIndex = json.optInt("step_index", 0)
+                    val action = json.optString("action", "")
+                    addLog("📍 步骤 $stepIndex: $action")
+                    executeStep(taskId, stepIndex, action, json)
+                }
+                
+                "no_task" -> {
+                    addLog("⚠️ 没有待执行的任务")
+                }
+                
                 "search_blogger" -> {
                     val bloggerName = json.optString("blogger_name", "")
                     if (bloggerName.isNotEmpty()) {
@@ -160,6 +186,7 @@ class MainActivity : AppCompatActivity() {
                         executeSearch(bloggerName)
                     }
                 }
+                
                 "message_ack" -> {
                     addLog("✅ 服务器确认收到消息")
                 }
@@ -167,6 +194,126 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             addLog("⚠️ 解析消息失败: ${e.message}")
         }
+    }
+    
+    /**
+     * 开始任务
+     */
+    private fun startTask() {
+        if (!::wsClient.isInitialized) {
+            addLog("❌ 请先连接服务器")
+            return
+        }
+        
+        val service = AutomationAccessibilityService.getInstance()
+        if (service == null) {
+            addLog("❌ 无障碍服务未启动")
+            showAccessibilityDialog()
+            return
+        }
+        
+        addLog("🚀 请求开始任务...")
+        val message = """{"type":"start_task"}"""
+        wsClient.sendMessage(message)
+    }
+    
+    /**
+     * 执行步骤
+     */
+    private fun executeStep(taskId: String, stepIndex: Int, action: String, json: JSONObject) {
+        val service = AutomationAccessibilityService.getInstance()
+        
+        if (service == null) {
+            addLog("❌ 无障碍服务未启动")
+            reportStepResult(taskId, stepIndex, false, "无障碍服务未启动")
+            return
+        }
+        
+        addLog("⚙️ 执行: $action")
+        
+        // 根据动作类型执行不同操作
+        when (action) {
+            "search_keyword" -> {
+                val keyword = json.optString("keyword", "")
+                addLog("🔍 搜索关键词: $keyword")
+                executeSearch(keyword)
+                reportStepResult(taskId, stepIndex, true, "搜索完成")
+            }
+            
+            "enter_first_video_author" -> {
+                addLog("👤 进入第一个作品的博主主页")
+                // TODO: 实现进入作品博主主页
+                reportStepResult(taskId, stepIndex, false, "功能开发中")
+            }
+            
+            "scroll_profile" -> {
+                val scrollCount = json.optInt("scroll_count", 3)
+                addLog("📜 滑动主页 $scrollCount 次")
+                // TODO: 实现滑动主页
+                reportStepResult(taskId, stepIndex, false, "功能开发中")
+            }
+            
+            "enter_first_video" -> {
+                addLog("🎬 进入第一个作品")
+                // TODO: 实现进入作品
+                reportStepResult(taskId, stepIndex, false, "功能开发中")
+            }
+            
+            "return_to_app" -> {
+                addLog("🔙 返回App主界面")
+                // TODO: 实现返回主界面
+                reportStepResult(taskId, stepIndex, false, "功能开发中")
+            }
+            
+            else -> {
+                addLog("⚠️ 未知动作: $action")
+                reportStepResult(taskId, stepIndex, false, "未知动作")
+            }
+        }
+    }
+    
+    /**
+     * 上报步骤结果
+     */
+    private fun reportStepResult(taskId: String, stepIndex: Int, success: Boolean, message: String) {
+        if (!::wsClient.isInitialized) return
+        
+        val result = """
+            {
+                "type": "step_result",
+                "task_id": "$taskId",
+                "step_index": $stepIndex,
+                "success": $success,
+                "message": "$message"
+            }
+        """.trimIndent()
+        
+        wsClient.sendMessage(result)
+        
+        val status = if (success) "✅" else "❌"
+        addLog("$status 步骤 $stepIndex: $message")
+    }
+    
+    /**
+     * 上报任务结果
+     */
+    private fun reportTaskResult(taskId: String, success: Boolean, result: Map<String, Any>) {
+        if (!::wsClient.isInitialized) return
+        
+        val resultJson = JSONObject(result).toString()
+        val message = """
+            {
+                "type": "task_result",
+                "task_id": "$taskId",
+                "success": $success,
+                "result": $resultJson
+            }
+        """.trimIndent()
+        
+        wsClient.sendMessage(message)
+        
+        val status = if (success) "✅" else "❌"
+        addLog("$status 任务完成: $taskId")
     }
     
     /**

@@ -69,7 +69,16 @@
             android:text="断开" />
     </LinearLayout>
 
-    <!-- 测试功能 -->
+    <!-- 任务控制 -->
+    <Button
+        android:id="@+id/startTaskBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🚀 开始任务"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+    
     <Button
         android:id="@+id/testSearchBtn"
         android:layout_width="match_parent"
