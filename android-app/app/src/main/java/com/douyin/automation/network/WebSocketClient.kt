@@ -26,6 +26,10 @@ class WebSocketClient(
         
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                // 发送注册消息
+                val deviceId = "android_${System.currentTimeMillis()}"
+                val registerMsg = """{"type":"register","device_id":"$deviceId"}"""
+                webSocket.send(registerMsg)
                 onConnected()
                 startHeartbeat()
             }
@@ -47,7 +51,9 @@ class WebSocketClient(
         })
     }
     
-    fun sendMessage(message: String) {
+    fun sendMessage(content: String) {
+        // 按照协议格式发送消息
+        val message = """{"type":"message","content":"$content"}"""
         webSocket?.send(message)
     }
     

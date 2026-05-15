@@ -31,6 +31,234 @@ async def get_devices():
         "devices": device_info
     }
 
+@app.get("/test")
+async def test_page():
+    """浏览器测试页面"""
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>WebSocket测试页面</title>
+        <meta charset="utf-8">
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                background: #f5f5f5;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: white;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            h1 { color: #333; }
+            .status {
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            .connected { background: #d4edda; color: #155724; }
+            .disconnected { background: #f8d7da; color: #721c24; }
+            input, button {
+                padding: 10px;
+                margin: 5px 0;
+                font-size: 14px;
+            }
+            input { width: 100%; box-sizing: border-box; }
+            button {
+                cursor: pointer;
+                background: #007bff;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 10px 20px;
+            }
+            button:hover { background: #0056b3; }
+            button:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+            }
+            #log {
+                background: #f8f9fa;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                height: 300px;
+                overflow-y: auto;
+                font-family: monospace;
+                font-size: 12px;
+            }
+            .log-item {
+                margin: 5px 0;
+                padding: 5px;
+                border-left: 3px solid #007bff;
+                background: white;
+            }
+            .log-send { border-left-color: #28a745; }
+            .log-receive { border-left-color: #17a2b8; }
+            .log-error { border-left-color: #dc3545; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🧪 WebSocket测试页面</h1>
+            
+            <div id="status" class="status disconnected">
+                ● 未连接
+            </div>
+            
+            <h3>服务器地址</h3>
+            <input type="text" id="serverUrl" value="ws://localhost/ws" placeholder="ws://服务器地址/ws">
+            
+            <div style="margin: 10px 0;">
+                <button id="connectBtn" onclick="connect()">连接</button>
+                <button id="disconnectBtn" onclick="disconnect()" disabled>断开</button>
+            </div>
+            
+            <h3>发送消息</h3>
+            <input type="text" id="message" placeholder="输入测试消息" onkeypress="if(event.key==='Enter')sendMessage()">
+            <button onclick="sendMessage()" id="sendBtn" disabled>发送消息</button>
+            
+            <h3>日志</h3>
+            <div id="log"></div>
+            
+            <div style="margin-top: 20px; padding: 10px; background: #e7f3ff; border-radius: 5px;">
+                <h4>📱 App连接地址</h4>
+                <code id="appUrl">ws://当前域名/ws</code>
+                <button onclick="copyAppUrl()" style="margin-left: 10px; padding: 5px 10px;">复制</button>
+            </div>
+        </div>
+        
+        <script>
+            let ws = null;
+            let deviceId = 'browser_test_' + Date.now();
+            
+            // 更新App连接地址
+            document.getElementById('appUrl').textContent =
+                'ws://' + window.location.host + '/ws';
+            
+            function addLog(message, type = 'info') {
+                const log = document.getElementById('log');
+                const item = document.createElement('div');
+                item.className = 'log-item log-' + type;
+                const time = new Date().toLocaleTimeString();
+                item.textContent = `[${time}] ${message}`;
+                log.appendChild(item);
+                log.scrollTop = log.scrollHeight;
+            }
+            
+            function updateStatus(connected) {
+                const status = document.getElementById('status');
+                const connectBtn = document.getElementById('connectBtn');
+                const disconnectBtn = document.getElementById('disconnectBtn');
+                const sendBtn = document.getElementById('sendBtn');
+                
+                if (connected) {
+                    status.className = 'status connected';
+                    status.textContent = '● 已连接';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    sendBtn.disabled = false;
+                } else {
+                    status.className = 'status disconnected';
+                    status.textContent = '● 未连接';
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    sendBtn.disabled = true;
+                }
+            }
+            
+            function connect() {
+                const url = document.getElementById('serverUrl').value;
+                addLog('正在连接: ' + url);
+                
+                try {
+                    ws = new WebSocket(url);
+                    
+                    ws.onopen = function() {
+                        addLog('✅ 连接成功!', 'receive');
+                        updateStatus(true);
+                        
+                        // 发送注册消息
+                        const registerMsg = {
+                            type: 'register',
+                            device_id: deviceId
+                        };
+                        ws.send(JSON.stringify(registerMsg));
+                        addLog('📤 发送注册: ' + JSON.stringify(registerMsg), 'send');
+                    };
+                    
+                    ws.onmessage = function(event) {
+                        addLog('📥 收到消息: ' + event.data, 'receive');
+                    };
+                    
+                    ws.onerror = function(error) {
+                        addLog('❌ 连接错误', 'error');
+                        updateStatus(false);
+                    };
+                    
+                    ws.onclose = function() {
+                        addLog('🔌 连接已关闭', 'error');
+                        updateStatus(false);
+                    };
+                    
+                } catch (error) {
+                    addLog('❌ 连接失败: ' + error.message, 'error');
+                    updateStatus(false);
+                }
+            }
+            
+            function disconnect() {
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                    addLog('断开连接');
+                    updateStatus(false);
+                }
+            }
+            
+            function sendMessage() {
+                const message = document.getElementById('message').value;
+                if (!message) {
+                    alert('请输入消息');
+                    return;
+                }
+                
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    alert('未连接到服务器');
+                    return;
+                }
+                
+                const msg = {
+                    type: 'message',
+                    content: message
+                };
+                
+                ws.send(JSON.stringify(msg));
+                addLog('📤 发送: ' + message, 'send');
+                document.getElementById('message').value = '';
+            }
+            
+            function copyAppUrl() {
+                const url = document.getElementById('appUrl').textContent;
+                navigator.clipboard.writeText(url).then(() => {
+                    alert('已复制: ' + url);
+                });
+            }
+            
+            // 页面加载时的提示
+            addLog('🎉 测试页面已加载');
+            addLog('💡 点击"连接"按钮开始测试');
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
 @app.get("/console")
 async def console():
     """Web控制台"""
@@ -81,11 +309,28 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket连接端点"""
     device_id = None
     await websocket.accept()
+    print(f"🔌 WebSocket连接已接受，等待注册消息...")
+    
+    # 创建一个任务来处理5秒后的主动推送
+    async def send_delayed_message():
+        await asyncio.sleep(5)
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "server_push",
+                "message": "连接5秒",
+                "timestamp": datetime.now().isoformat()
+            }))
+            print(f"📤 服务器主动推送 [{device_id}]: 连接5秒")
+        except Exception as e:
+            print(f"⚠️ 推送失败: {e}")
     
     try:
         # 等待设备发送注册消息
+        print(f"⏳ 等待接收消息...")
         data = await websocket.receive_text()
+        print(f"📩 收到原始数据: {data}")
         message = json.loads(data)
+        print(f"📦 解析后的消息: {message}")
         
         if message.get("type") == "register":
             device_id = message.get("device_id", f"device_{len(connected_devices)}")
@@ -104,10 +349,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 "message": "连接成功"
             }))
             
+            # 启动5秒延迟推送任务
+            asyncio.create_task(send_delayed_message())
+            
             # 处理消息循环
             while True:
                 data = await websocket.receive_text()
+                print(f"📩 [{device_id}] 收到原始数据: {data}")
                 message = json.loads(data)
+                print(f"📦 [{device_id}] 解析后的消息: {message}")
                 
                 if message.get("type") == "heartbeat":
                     # 心跳响应
@@ -123,12 +373,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     content = message.get("content", "")
                     print(f"📨 收到消息 [{device_id}]: {content}")
                     
-                    # 回复消息
-                    await websocket.send_text(json.dumps({
-                        "type": "message",
+                    # 回复消息，回显收到的内容
+                    response = json.dumps({
+                        "type": "message_ack",
                         "content": f"服务器收到: {content}",
+                        "received_message": content,
                         "timestamp": datetime.now().isoformat()
-                    }))
+                    })
+                    print(f"📤 [{device_id}] 发送响应: {response}")
+                    await websocket.send_text(response)
+                    print(f"✅ [{device_id}] 响应已发送")
                     
                 elif message.get("type") == "status":
                     # 状态上报
@@ -149,6 +403,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     print("🚀 启动服务器...")
-    print("📱 WebSocket: ws://0.0.0.0:8080/ws")
-    print("🌐 控制台: http://0.0.0.0:8080")
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    print("📱 WebSocket: ws://0.0.0.0:50002/ws")
+    print("🌐 控制台: http://0.0.0.0:50002")
+    print("🧪 测试页面: http://0.0.0.0:50002/test")
+    uvicorn.run(app, host="0.0.0.0", port=50002)
