@@ -1,226 +1,212 @@
-# APK自动下载和安装
+# 📜 脚本说明
 
-## 📋 功能说明
+## 📥 APK下载脚本
 
-自动化脚本，用于：
-1. 监控GitHub Actions构建状态
-2. 构建完成后自动下载APK
-3. 自动安装到连接的Android设备
-4. 自动启动应用
+### download-apk.py
+从GitHub Actions下载最新成功构建的APK到本地。
 
-## 🔧 前置要求
-
-### 1. 安装GitHub CLI
+**使用方法：**
 ```bash
-# macOS
-brew install gh
+# 设置GitHub Token
+export GITHUB_TOKEN=your_github_personal_access_token
 
-# Windows
-winget install GitHub.cli
-
-# Linux
-# 参考: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+# 下载APK
+python3 scripts/download-apk.py
 ```
 
-### 2. 登录GitHub
+**输出：**
+- APK保存到：`apk-releases/latest.apk`
+- 同时保留原始文件：`apk-releases/app-debug.apk`
+
+### download-apk.sh
+Bash版本的下载脚本（功能相同）。
+
+**使用方法：**
 ```bash
-gh auth login
+export GITHUB_TOKEN=your_token
+bash scripts/download-apk.sh
 ```
 
-### 3. 安装Android SDK Platform Tools
-- 下载：https://developer.android.com/studio/releases/platform-tools
-- 确保`adb`命令可用
+### auto-download-apk.sh
+自动监控GitHub Actions并下载新构建的APK。
 
-### 4. 连接Android设备
+**使用方法：**
 ```bash
-# 开启USB调试
-# 连接手机到电脑
-# 授权USB调试
+# 后台运行
+export GITHUB_TOKEN=your_token
+nohup bash scripts/auto-download-apk.sh > apk-download.log 2>&1 &
 
-# 验证连接
-adb devices
+# 查看日志
+tail -f apk-download.log
 ```
 
-## 🚀 使用方法
+**功能：**
+- 每5分钟检查一次新构建
+- 发现新构建自动下载
+- 保存到`apk-releases/latest.apk`
 
-### Linux/macOS
+## 🔍 构建监控脚本
+
+### monitor-build.py
+实时监控GitHub Actions构建状态。
+
+**使用方法：**
 ```bash
-# 赋予执行权限
-chmod +x scripts/auto-install-apk.sh
-
-# 运行脚本
-./scripts/auto-install-apk.sh
+python3 scripts/monitor-build.py
 ```
 
-### Windows
-```cmd
-# 直接运行
-scripts\auto-install-apk.bat
+### monitor-build.sh
+Bash版本的监控脚本。
+
+**使用方法：**
+```bash
+bash scripts/monitor-build.sh
 ```
 
-## 📊 执行流程
+## 🔑 获取GitHub Token
+
+1. 访问：https://github.com/settings/tokens
+2. 点击"Generate new token (classic)"
+3. 选择权限：
+   - `repo` (完整仓库访问)
+   - `workflow` (访问GitHub Actions)
+4. 生成并复制token
+5. 设置环境变量：
+   ```bash
+   export GITHUB_TOKEN=your_token_here
+   
+   # 永久保存（添加到~/.bashrc或~/.zshrc）
+   echo 'export GITHUB_TOKEN=your_token_here' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+## 📋 使用示例
+
+### 手动下载最新APK
+```bash
+# 1. 设置token
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+
+# 2. 下载APK
+python3 scripts/download-apk.py
+
+# 3. 查看下载的APK
+ls -lh apk-releases/latest.apk
+```
+
+### 自动监控并下载
+```bash
+# 1. 设置token
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+
+# 2. 后台运行监控
+nohup bash scripts/auto-download-apk.sh > apk-download.log 2>&1 &
+
+# 3. 查看日志
+tail -f apk-download.log
+
+# 4. 停止监控
+pkill -f auto-download-apk.sh
+```
+
+### 集成到服务器启动
+```bash
+# 在服务器启动脚本中添加
+export GITHUB_TOKEN=your_token
+nohup bash scripts/auto-download-apk.sh > apk-download.log 2>&1 &
+cd cloud-server && python3 src/main.py
+```
+
+## 🎯 工作流程
 
 ```
-1. 检查依赖 (gh, adb)
-   ↓
-2. 检查设备连接
-   ↓
-3. 获取最新构建ID
-   ↓
-4. 等待构建完成
-   ↓
-5. 下载APK到 apk-downloads/
-   ↓
-6. 卸载旧版本
-   ↓
-7. 安装新版本
-   ↓
-8. 启动应用
-   ↓
-9. 完成！
+GitHub Actions构建APK
+         ↓
+    上传到Artifacts
+         ↓
+  auto-download-apk.sh监控
+         ↓
+    发现新构建
+         ↓
+  download-apk.py下载
+         ↓
+  保存到apk-releases/latest.apk
+         ↓
+  服务器提供下载
 ```
 
-## 📝 输出示例
+## 📱 服务器端APK下载API
 
+服务器已配置APK下载接口：
+
+```bash
+# 获取APK信息
+curl http://elxn1431783.bohrium.tech:50002/api/apk/latest
+
+# 下载APK
+curl -O http://elxn1431783.bohrium.tech:50002/api/apk/download
 ```
-🚀 APK自动下载和安装脚本
+
+## 🔧 故障排除
+
+### 问题1：未设置GITHUB_TOKEN
+```
+⚠️  未设置GITHUB_TOKEN环境变量
+```
+**解决：** 设置GitHub Personal Access Token
+
+### 问题2：Token权限不足
+```
+❌ 网络错误: 403 Forbidden
+```
+**解决：** 确保token有`repo`和`workflow`权限
+
+### 问题3：未找到成功的构建
+```
+❌ 未找到成功的构建
+```
+**解决：** 等待GitHub Actions构建完成
+
+### 问题4：下载失败
+```
+❌ APK下载失败
+```
+**解决：** 检查网络连接和token有效性
+
+## 📊 日志说明
+
+### 下载日志
+```
+📥 从GitHub Actions下载APK
 ================================
-📋 检查依赖...
-✅ 依赖检查通过
-📱 检查设备连接...
-✅ 检测到 1 个设备
-List of devices attached
-ABC123456789    device
+🔍 查找最新成功的构建...
+✅ 找到构建: Run #30 (ID: 25907100805)
+   Commit: fix: 移除多余的ScrollView闭合标签
+📦 获取artifacts...
+✅ 找到artifact: app-debug (ID: 1234567)
+⬇️  下载artifact...
+✅ 下载完成
+📦 解压APK...
+✅ APK已保存到: apk-releases/latest.apk
 
-🔍 获取最新构建...
-✅ 找到构建 ID: 12345678
-⏳ 等待构建完成...
-⏳ 构建中... (状态: in_progress)
-⏳ 构建中... (状态: in_progress)
-✅ 构建成功！
-📥 下载APK...
-✅ APK已下载: /path/to/apk-downloads/app-debug.apk
-📲 安装APK到设备...
-🗑️  卸载旧版本...
-📦 安装新版本...
-Performing Streamed Install
-Success
-✅ 安装成功！
-🚀 启动应用...
-🎉 完成！应用已启动
+📊 文件信息:
+  路径: apk-releases/latest.apk
+  大小: 5.23 MB
 
+🎉 下载完成！
+```
+
+### 监控日志
+```
+🤖 启动APK自动下载监控
 ================================
-✅ 全部完成！
-APK位置: /path/to/apk-downloads/app-debug.apk
-================================
+仓库: mesunrise/aip
+检查间隔: 300秒
+APK目录: apk-releases
+
+[2026-05-15 16:00:00] 🔍 检查新构建...
+[2026-05-15 16:00:01] 🎉 发现新构建: Run ID 25907100805
+[2026-05-15 16:00:01] 📥 开始下载APK...
+[2026-05-15 16:00:05] ✅ APK下载成功
+[2026-05-15 16:00:05] ⏰ 等待300秒...
 ```
-
-## 🔍 故障排除
-
-### 问题1：未检测到设备
-```bash
-# 检查设备连接
-adb devices
-
-# 重启adb服务
-adb kill-server
-adb start-server
-
-# 检查USB调试是否开启
-# 检查是否授权此电脑
-```
-
-### 问题2：GitHub CLI未登录
-```bash
-# 登录GitHub
-gh auth login
-
-# 验证登录状态
-gh auth status
-```
-
-### 问题3：构建失败
-```bash
-# 查看构建日志
-gh run view <RUN_ID> --repo mesunrise/aip --log
-
-# 在浏览器中查看
-gh run view <RUN_ID> --repo mesunrise/aip --web
-```
-
-### 问题4：安装失败
-```bash
-# 检查设备存储空间
-adb shell df
-
-# 手动安装
-adb install -r apk-downloads/app-debug.apk
-
-# 查看详细错误
-adb install -r -d apk-downloads/app-debug.apk
-```
-
-## 🎯 高级用法
-
-### 监控特定构建
-```bash
-# 修改脚本中的RUN_ID
-RUN_ID=12345678
-```
-
-### 安装到特定设备
-```bash
-# 查看所有设备
-adb devices
-
-# 指定设备安装
-adb -s ABC123456789 install -r app-debug.apk
-```
-
-### 自动化测试
-```bash
-# 安装后自动运行测试
-./scripts/auto-install-apk.sh && adb shell am instrument -w com.douyin.automation.test/androidx.test.runner.AndroidJUnitRunner
-```
-
-## 📦 集成到CI/CD
-
-### GitHub Actions
-```yaml
-- name: Download and Install APK
-  run: |
-    ./scripts/auto-install-apk.sh
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-### 本地开发流程
-```bash
-# 1. 修改代码
-git add .
-git commit -m "feat: 新功能"
-git push
-
-# 2. 自动下载并安装
-./scripts/auto-install-apk.sh
-
-# 3. 测试
-adb logcat | grep "DouyinAutomation"
-```
-
-## 🔐 安全注意事项
-
-1. **GitHub Token**：脚本使用`gh` CLI，需要有效的GitHub认证
-2. **设备授权**：确保只在授权的设备上运行
-3. **APK签名**：debug版本使用debug签名，不要用于生产环境
-
-## 📚 相关文档
-
-- [GitHub CLI文档](https://cli.github.com/manual/)
-- [ADB文档](https://developer.android.com/studio/command-line/adb)
-- [GitHub Actions Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts)
-
----
-
-**最后更新：** 2026-05-15  
-**维护者：** 开发团队
