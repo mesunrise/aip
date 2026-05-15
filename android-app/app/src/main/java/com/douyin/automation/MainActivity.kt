@@ -1,22 +1,31 @@
 package com.douyin.automation
 
+import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import com.douyin.automation.accessibility.AutomationAccessibilityService
 import com.douyin.automation.network.WebSocketClient
 import com.douyin.automation.permission.PermissionChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
     
@@ -51,6 +60,7 @@ class MainActivity : AppCompatActivity() {
         val messageInput = findViewById<EditText>(R.id.messageInput)
         val checkAccessibilityBtn = findViewById<Button>(R.id.checkAccessibilityBtn)
         val startTaskBtn = findViewById<Button>(R.id.startTaskBtn)
+        val updateBtn = findViewById<Button>(R.id.updateBtn)
         val testSearchBtn = findViewById<Button>(R.id.testSearchBtn)
         
         // 默认服务器地址
@@ -86,6 +96,11 @@ class MainActivity : AppCompatActivity() {
         // 开始任务按钮
         startTaskBtn.setOnClickListener {
             startTask()
+        }
+        
+        // 检查更新按钮
+        updateBtn.setOnClickListener {
+            checkUpdate()
         }
         
         // 测试搜索按钮
@@ -350,6 +365,157 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+    
+    /**
+     * 检查更新
+     */
+    private fun checkUpdate() {
+        addLog("🔍 检查更新...")
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val serverUrl = serverUrlInput.text.toString()
+                    .replace("/ws", "")
+                    .replace("ws://", "http://")
+                    .replace("wss://", "https://")
+                
+                val apiUrl = "$serverUrl/api/apk/latest"
+                addLog("📡 请求: $apiUrl")
+                
+                val url = URL(apiUrl)
+                val connection = url.openConnection()
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                
+                val response = connection.getInputStream().bufferedReader().readText()
+                val json = JSONObject(response)
+                
+                val filename = json.optString("filename", "unknown")
+                val sizeMb = json.optDouble("size_mb", 0.0)
+                val downloadUrl = json.optString("download_url", "")
+                
+                withContext(Dispatchers.Main) {
+                    addLog("✅ 找到新版本")
+                    addLog("📦 文件: $filename")
+                    addLog("📊 大小: ${sizeMb}MB")
+                    
+                    // 显示更新对话框
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("发现新版本")
+                        .setMessage("文件: $filename\n大小: ${sizeMb}MB\n\n是否立即更新？")
+                        .setPositiveButton("立即更新") { _, _ ->
+                            downloadApk(downloadUrl)
+                        }
+                        .setNegativeButton("稍后", null)
+                        .show()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    addLog("❌ 检查更新失败: ${e.message}")
+                }
+            }
+        }
+    }
+    
+    /**
+     * 下载APK
+     */
+    private fun downloadApk(downloadUrl: String) {
+        addLog("📥 开始下载APK...")
+        
+        try {
+            // 检查安装权限
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!packageManager.canRequestPackageInstalls()) {
+                    addLog("⚠️ 需要安装权限")
+                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                    intent.data = Uri.parse("package:$packageName")
+                    startActivity(intent)
+                    return
+                }
+            }
+            
+            val serverUrl = serverUrlInput.text.toString()
+                .replace("/ws", "")
+                .replace("ws://", "http://")
+                .replace("wss://", "https://")
+            
+            val fullUrl = if (downloadUrl.startsWith("http")) {
+                downloadUrl
+            } else {
+                "$serverUrl$downloadUrl"
+            }
+            
+            addLog("📡 下载地址: $fullUrl")
+            
+            val request = DownloadManager.Request(Uri.parse(fullUrl))
+            request.setTitle("Phone自动化更新")
+            request.setDescription("正在下载最新版本...")
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "app-debug.apk")
+            
+            val downloadManager = getSystemService(Context.DOWNLOAD_MANAGER_SERVICE) as DownloadManager
+            val downloadId = downloadManager.enqueue(request)
+            
+            addLog("✅ 下载已开始 (ID: $downloadId)")
+            addLog("📂 保存位置: Download/app-debug.apk")
+            
+            // 监听下载完成
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                    if (id == downloadId) {
+                        addLog("✅ 下载完成")
+                        unregisterReceiver(this)
+                        installApk()
+                    }
+                }
+            }
+            
+            registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+            
+        } catch (e: Exception) {
+            addLog("❌ 下载失败: ${e.message}")
+        }
+    }
+    
+    /**
+     * 安装APK
+     */
+    private fun installApk() {
+        try {
+            val apkFile = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "app-debug.apk")
+            
+            if (!apkFile.exists()) {
+                addLog("❌ APK文件不存在")
+                return
+            }
+            
+            addLog("📦 安装APK...")
+            
+            val intent = Intent(Intent.ACTION_VIEW)
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                val apkUri = FileProvider.getUriForFile(
+                    this,
+                    "$packageName.fileprovider",
+                    apkFile
+                )
+                intent.setDataAndType(apkUri, "application/vnd.android.package-archive")
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } else {
+                intent.setDataAndType(Uri.fromFile(apkFile), "application/vnd.android.package-archive")
+            }
+            
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            
+            addLog("✅ 已跳转到安装界面")
+            
+        } catch (e: Exception) {
+            addLog("❌ 安装失败: ${e.message}")
+        }
     }
     
     /**
