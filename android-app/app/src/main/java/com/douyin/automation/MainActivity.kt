@@ -112,6 +112,9 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     updateStatus("已连接")
                     addLog("✅ 连接成功")
+                    
+                    // 将WebSocket客户端传递给无障碍服务
+                    AutomationAccessibilityService.getInstance()?.setWebSocketClient(wsClient)
                 }
             },
             onMessage = { message ->
