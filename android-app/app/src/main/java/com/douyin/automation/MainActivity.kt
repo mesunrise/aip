@@ -459,7 +459,7 @@ class MainActivity : AppCompatActivity() {
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "app-debug.apk")
             
-            val downloadManager = getSystemService(Context.DOWNLOAD_MANAGER_SERVICE) as DownloadManager
+            val downloadManager = getSystemService(DOWNLOAD_MANAGER_SERVICE) as DownloadManager
             val downloadId = downloadManager.enqueue(request)
             
             addLog("✅ 下载已开始 (ID: $downloadId)")
