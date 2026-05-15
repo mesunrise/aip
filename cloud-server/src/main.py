@@ -389,80 +389,34 @@ async def websocket_endpoint(websocket: WebSocket):
                 message = json.loads(data)
                 print(f"📦 [{device_id}] 解析后的消息: {message}")
                 
-                if message.get("type") == "heartbeat":
-                    # 心跳响应
-                    device_info[device_id]["last_heartbeat"] = datetime.now().isoformat()
-                    await websocket.send_text(json.dumps({
-                        "type": "heartbeat_ack",
-                        "timestamp": datetime.now().isoformat()
-                    }))
-                    print(f"💓 心跳: {device_id}")
-                    
-                elif message.get("type") == "message":
-                    # 处理普通消息
-                    content = message.get("content", "")
-                    print(f"📨 收到消息 [{device_id}]: {content}")
-                    
-                    # 回复消息，回显收到的内容
-                    response = json.dumps({
-                        "type": "message_ack",
-                        "content": f"服务器收到: {content}",
-                        "received_message": content,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    print(f"📤 [{device_id}] 发送响应: {response}")
-                    await websocket.send_text(response)
-                    print(f"✅ [{device_id}] 响应已发送")
-                    
-                elif message.get("type") == "status":
-                    # 状态上报
-                    status = message.get("status", {})
-                    device_info[device_id].update(status)
-                    print(f"📊 状态更新 [{device_id}]: {status}")
+            if message.get("type") == "heartbeat":
+                # 心跳响应
+                await websocket.send_text(json.dumps({
+                    "type": "heartbeat_ack",
+                    "timestamp": datetime.now().isoformat()
+                }))
+                print(f"💓 心跳响应")
                 
-                elif message.get("type") == "start_task":
-                    # App请求开始任务
-                    print(f"🎯 [{device_id}] 请求开始任务")
-                    next_task = scheduler.get_next_task()
-                    if next_task:
-                        await scheduler.start_task(next_task, websocket)
-                    else:
-                        await websocket.send_json({
-                            "type": "no_task",
-                            "message": "没有待执行的任务"
-                        })
+            elif message.get("type") == "message":
+                # 处理普通消息
+                content = message.get("content", "")
+                print(f"📨 收到消息: {content}")
                 
-                elif message.get("type") == "step_result":
-                    # 步骤执行结果
-                    task_id = message.get("task_id")
-                    step_index = message.get("step_index")
-                    success = message.get("success", False)
-                    step_message = message.get("message", "")
-                    scheduler.handle_step_result(task_id, step_index, success, step_message)
-                
-                elif message.get("type") == "task_result":
-                    # 任务完成结果
-                    task_id = message.get("task_id")
-                    success = message.get("success", False)
-                    result = message.get("result", {})
-                    scheduler.handle_task_result(task_id, success, result)
-                    
-                    # 自动执行下一个任务
-                    next_task = scheduler.get_next_task()
-                    if next_task:
-                        await asyncio.sleep(5)  # 延迟5秒
-                        await scheduler.start_task(next_task, websocket)
+                # 回复消息，回显收到的内容
+                response = json.dumps({
+                    "type": "message_ack",
+                    "content": f"服务器收到: {content}",
+                    "received_message": content,
+                    "timestamp": datetime.now().isoformat()
+                })
+                print(f"📤 发送响应: {response}")
+                await websocket.send_text(response)
+                print(f"✅ 响应已发送")
                     
     except WebSocketDisconnect:
-        if device_id:
-            print(f"❌ 设备已断开: {device_id}")
-            connected_devices.pop(device_id, None)
-            device_info.pop(device_id, None)
+        print(f"❌ WebSocket连接已断开")
     except Exception as e:
         print(f"⚠️ 错误: {e}")
-        if device_id:
-            connected_devices.pop(device_id, None)
-            device_info.pop(device_id, None)
 
 if __name__ == "__main__":
     print("🚀 启动服务器...")
