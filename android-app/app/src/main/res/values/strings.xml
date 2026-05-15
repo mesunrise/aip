@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Phone自动化</string>
+    <string name="accessibility_service_description">Phone自动化服务，用于实现抖音自动化操作。\n\n需要的权限：\n- 查看屏幕内容\n- 执行点击、输入等操作\n\n请放心，本服务仅在您主动使用时工作，不会收集或上传任何个人信息。</string>
+    <string name="permission_guide_title">开启无障碍权限</string>
+    <string name="permission_guide_message">为了实现自动化功能，需要开启无障碍服务权限。\n\n请在设置中找到"Phone自动化"并开启。</string>
+    <string name="open_settings">打开设置</string>
+    <string name="cancel">取消</string>
+</resources>
