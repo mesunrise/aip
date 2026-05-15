@@ -3,16 +3,11 @@ import json
 from datetime import datetime
 from typing import Dict, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
-from pathlib import Path
+from fastapi.responses import HTMLResponse
 import uvicorn
 from task_scheduler import TaskScheduler
 
 app = FastAPI(title="抖音自动化云端服务器")
-
-# APK存储目录
-APK_DIR = Path("/personal/ai_workspace/aip/apk-releases")
-LATEST_APK = APK_DIR / "latest.apk"
 
 # 存储所有连接的设备
 connected_devices: Dict[str, WebSocket] = {}
@@ -25,7 +20,7 @@ scheduler = TaskScheduler()
 @app.on_event("startup")
 async def startup_event():
     print("🚀 服务器启动中...")
-    scheduler.load_tasks_from_md("../tasks/automation-tasks.md")
+    scheduler.load_tasks_from_md("tasks/automation-tasks.md")
     print("✅ 服务器启动完成")
 
 @app.get("/")
@@ -63,50 +58,8 @@ async def get_task_detail(task_id: str):
 @app.post("/api/tasks/reload")
 async def reload_tasks():
     """重新加载任务配置"""
-    scheduler.load_tasks_from_md("../tasks/automation-tasks.md")
+    scheduler.load_tasks_from_md("tasks/automation-tasks.md")
     return {"message": "Tasks reloaded", "stats": scheduler.get_stats()}
-
-@app.get("/api/apk/latest")
-async def get_latest_apk_info():
-    """获取最新APK信息"""
-    if not LATEST_APK.exists():
-        return JSONResponse(
-            status_code=404,
-            content={"error": "APK not found"}
-        )
-    
-    # 获取文件信息
-    stat = LATEST_APK.stat()
-    real_path = LATEST_APK.resolve()
-    
-    return {
-        "version": "latest",
-        "filename": real_path.name,
-        "size": stat.st_size,
-        "size_mb": round(stat.st_size / 1024 / 1024, 2),
-        "modified": stat.st_mtime,
-        "download_url": f"http://elxn1431783.bohrium.tech:50002/api/apk/download"
-    }
-
-@app.get("/api/apk/download")
-async def download_latest_apk():
-    """下载最新APK"""
-    if not LATEST_APK.exists():
-        return JSONResponse(
-            status_code=404,
-            content={"error": "APK not found"}
-        )
-    
-    real_path = LATEST_APK.resolve()
-    
-    return FileResponse(
-        path=str(real_path),
-        media_type="application/vnd.android.package-archive",
-        filename="app-debug.apk",
-        headers={
-            "Content-Disposition": "attachment; filename=app-debug.apk"
-        }
-    )
 
 @app.get("/test")
 async def test_page():
@@ -470,13 +423,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif message.get("type") == "start_task":
                     # App请求开始任务
                     print(f"🎯 [{device_id}] 请求开始任务")
-                    print(f"📋 当前任务队列: {len(scheduler.tasks)} 个任务")
                     next_task = scheduler.get_next_task()
                     if next_task:
-                        print(f"✅ 找到任务: {next_task.get('task_id')} - {next_task.get('task_name')}")
                         await scheduler.start_task(next_task, websocket)
                     else:
-                        print(f"⚠️ 没有待执行的任务")
                         await websocket.send_json({
                             "type": "no_task",
                             "message": "没有待执行的任务"
