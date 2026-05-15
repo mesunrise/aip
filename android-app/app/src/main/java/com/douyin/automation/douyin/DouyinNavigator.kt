@@ -250,6 +250,13 @@ class DouyinNavigator(
      * 检查是否在博主主页
      */
     fun isOnProfilePage(): Boolean {
+        Log.d(TAG, "检查是否在博主主页...")
+        
+        // 打印当前界面节点树
+        Log.d(TAG, "========== 当前界面节点树 ==========")
+        locator.printCurrentTree()
+        Log.d(TAG, "====================================")
+        
         // 检查是否有"作品"、"喜欢"等标签
         val indicators = listOf(
             DouyinElements.PROFILE_TAB_WORKS,
@@ -258,12 +265,15 @@ class DouyinNavigator(
         )
         
         for (indicator in indicators) {
-            val node = locator.findByText(indicator, exact = true, timeout = 2000)
+            Log.d(TAG, "查找标签: $indicator")
+            val node = locator.findByText(indicator, exact = false, timeout = 2000)
             if (node != null) {
+                Log.d(TAG, "✅ 找到标签: $indicator")
                 return true
             }
         }
         
+        Log.w(TAG, "⚠️ 未找到主页标签")
         return false
     }
     
