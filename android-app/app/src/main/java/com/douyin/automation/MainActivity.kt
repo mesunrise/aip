@@ -282,6 +282,18 @@ class MainActivity : AppCompatActivity() {
         addLog("⚙️ 执行: $action")
 
         when (action) {
+            "launch_douyin" -> {
+                addLog("📱 启动抖音App")
+                CoroutineScope(Dispatchers.IO).launch {
+                    val success = service.launchDouyin()
+                    val message = if (success) "抖音启动成功" else "抖音启动失败"
+                    runOnUiThread {
+                        addLog("✅ $message")
+                        reportStepResult(taskId, stepIndex, success, message)
+                    }
+                }
+            }
+            
             "search_keyword" -> {
                 val keyword = json.optString("keyword", "")
                 addLog("🔍 搜索关键词: $keyword")

@@ -219,6 +219,19 @@ class AutomationAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * 启动抖音App
+     */
+    fun launchDouyin(): Boolean {
+        return try {
+            Log.d(TAG, "📱 启动抖音App")
+            douyinLauncher.launch()
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ 启动抖音失败", e)
+            false
+        }
+    }
+
     fun cancelCurrentTask() {
         currentSearchTask?.cancel()
         currentSearchAndExploreTask?.cancel()

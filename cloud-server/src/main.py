@@ -418,16 +418,30 @@ async def websocket_endpoint(websocket: WebSocket):
                 print(f"✅ [{device_id}] 响应已发送")
 
             elif message_type == "start_task":
-                task = scheduler.get_next_task()
-                if task is None:
-                    print(f"⚠️ [{device_id}] 当前没有待执行任务")
-                    await websocket.send_text(json.dumps({
-                        "type": "no_task",
-                        "timestamp": datetime.now().isoformat()
-                    }))
-                else:
-                    print(f"🚀 [{device_id}] 下发任务: {task.get('task_id')}")
-                    await scheduler.start_task(task, websocket)
+                print(f"🎯 [{device_id}] 收到开始任务请求")
+                
+                # 简单测试：直接发送打开抖音指令
+                test_task = {
+                    "type": "test_launch",
+                    "task_id": f"test_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    "task_name": "测试打开抖音"
+                }
+                
+                print(f"📤 [{device_id}] 发送测试任务: 打开抖音")
+                await websocket.send_json({
+                    "type": "task_start",
+                    "task_id": test_task["task_id"],
+                    "task_name": test_task["task_name"],
+                    "total_steps": 1
+                })
+                
+                print(f"📤 [{device_id}] 发送步骤: 打开抖音")
+                await websocket.send_json({
+                    "type": "step",
+                    "task_id": test_task["task_id"],
+                    "step_index": 1,
+                    "action": "launch_douyin"
+                })
 
             elif message_type == "step_result":
                 task_id = message.get("task_id", "")
