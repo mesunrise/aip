@@ -197,10 +197,11 @@ class MainActivity : AppCompatActivity() {
                 }
                 
                 "search_blogger" -> {
+                    val taskId = json.optString("task_id", "")
                     val bloggerName = json.optString("blogger_name", "")
                     if (bloggerName.isNotEmpty()) {
                         addLog("🎯 收到搜索指令: $bloggerName")
-                        executeSearch(bloggerName)
+                        executeSearch(taskId.ifBlank { "search_blogger_${System.currentTimeMillis()}" }, bloggerName)
                     }
                 }
                 
@@ -231,7 +232,7 @@ class MainActivity : AppCompatActivity() {
         
         addLog("🚀 请求开始任务...")
         val message = """{"type":"start_task"}"""
-        wsClient.sendMessage(message)
+        wsClient.sendRawMessage(message)
     }
     
     /**
@@ -239,52 +240,66 @@ class MainActivity : AppCompatActivity() {
      */
     private fun executeStep(taskId: String, stepIndex: Int, action: String, json: JSONObject) {
         val service = AutomationAccessibilityService.getInstance()
-        
+
         if (service == null) {
             addLog("❌ 无障碍服务未启动")
             reportStepResult(taskId, stepIndex, false, "无障碍服务未启动")
             return
         }
-        
+
         addLog("⚙️ 执行: $action")
-        
-        // 根据动作类型执行不同操作
+
         when (action) {
             "search_keyword" -> {
                 val keyword = json.optString("keyword", "")
                 addLog("🔍 搜索关键词: $keyword")
-                executeSearch(keyword)
-                reportStepResult(taskId, stepIndex, true, "搜索完成")
+                CoroutineScope(Dispatchers.IO).launch {
+                    val success = service.searchKeyword(keyword)
+                    val message = if (success) "搜索完成" else "搜索失败"
+                    runOnUiThread { reportStepResult(taskId, stepIndex, success, message) }
+                }
             }
-            
+
             "enter_first_video_author" -> {
                 addLog("👤 进入第一个作品的博主主页")
-                // TODO: 实现进入作品博主主页
-                reportStepResult(taskId, stepIndex, false, "功能开发中")
+                CoroutineScope(Dispatchers.IO).launch {
+                    val success = service.enterFirstVideoAuthor()
+                    val message = if (success) "已进入第一个作品作者主页" else "进入第一个作品作者主页失败"
+                    runOnUiThread { reportStepResult(taskId, stepIndex, success, message) }
+                }
             }
-            
+
             "scroll_profile" -> {
                 val scrollCount = json.optInt("scroll_count", 3)
                 addLog("📜 滑动主页 $scrollCount 次")
-                // TODO: 实现滑动主页
-                reportStepResult(taskId, stepIndex, false, "功能开发中")
+                CoroutineScope(Dispatchers.IO).launch {
+                    val success = service.scrollProfile(scrollCount)
+                    val message = if (success) "主页滑动完成" else "主页滑动失败"
+                    runOnUiThread { reportStepResult(taskId, stepIndex, success, message) }
+                }
             }
-            
+
             "enter_first_video" -> {
                 addLog("🎬 进入第一个作品")
-                // TODO: 实现进入作品
-                reportStepResult(taskId, stepIndex, false, "功能开发中")
+                CoroutineScope(Dispatchers.IO).launch {
+                    val success = service.enterFirstVideo()
+                    val message = if (success) "已进入第一个作品" else "进入第一个作品失败"
+                    runOnUiThread { reportStepResult(taskId, stepIndex, success, message) }
+                }
             }
-            
+
             "return_to_app" -> {
                 addLog("🔙 返回App主界面")
-                // TODO: 实现返回主界面
-                reportStepResult(taskId, stepIndex, false, "功能开发中")
+                CoroutineScope(Dispatchers.IO).launch {
+                    val success = service.returnToAppHome()
+                    val message = if (success) "已返回App主界面" else "返回App主界面失败"
+                    runOnUiThread { reportStepResult(taskId, stepIndex, success, message) }
+                }
             }
-            
+
             else -> {
                 addLog("⚠️ 未知动作: $action")
-                reportStepResult(taskId, stepIndex, false, "未知动作")
+                reportStepResult(taskId, stepIndex, false, "未知动作: $action")
             }
         }
     }
@@ -305,7 +320,7 @@ class MainActivity : AppCompatActivity() {
             }
         """.trimIndent()
         
-        wsClient.sendMessage(result)
+        wsClient.sendRawMessage(result)
         
         val status = if (success) "✅" else "❌"
         addLog("$status 步骤 $stepIndex: $message")
@@ -327,7 +342,7 @@ class MainActivity : AppCompatActivity() {
             }
         """.trimIndent()
         
-        wsClient.sendMessage(message)
+        wsClient.sendRawMessage(message)
         
         val status = if (success) "✅" else "❌"
         addLog("$status 任务完成: $taskId")
@@ -336,7 +351,7 @@ class MainActivity : AppCompatActivity() {
     /**
      * 执行搜索任务
      */
-    private fun executeSearch(bloggerName: String) {
+    private fun executeSearch(taskId: String, bloggerName: String) {
         val service = AutomationAccessibilityService.getInstance()
         
         if (service == null) {
@@ -346,7 +361,7 @@ class MainActivity : AppCompatActivity() {
         }
         
         addLog("🚀 开始执行搜索任务...")
-        service.executeSearchTask(bloggerName)
+        service.executeSearchTask(taskId, bloggerName)
     }
     
     /**
@@ -362,7 +377,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("搜索") { _, _ ->
                 val bloggerName = input.text.toString()
                 if (bloggerName.isNotEmpty()) {
-                    executeSearch(bloggerName)
+                    executeSearch("manual_test_${System.currentTimeMillis()}", bloggerName)
                 }
             }
             .setNegativeButton("取消", null)

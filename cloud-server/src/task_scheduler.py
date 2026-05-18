@@ -16,6 +16,8 @@ class TaskScheduler:
         self.running_tasks: Dict[str, Dict] = {}
         self.completed_tasks: List[Dict] = []
         self.failed_tasks: List[Dict] = []
+        self.step_waiters: Dict[str, asyncio.Event] = {}
+        self.task_waiters: Dict[str, asyncio.Event] = {}
         
     def load_tasks_from_md(self, filepath: str = "tasks/automation-tasks.md"):
         """从MD文档加载任务"""
@@ -99,7 +101,10 @@ class TaskScheduler:
         for index, step in enumerate(steps, 1):
             action = step.get('action')
             print(f"📍 步骤 {index}/{len(steps)}: {action}")
-            
+
+            step_event = asyncio.Event()
+            self.step_waiters[f"{task_id}:{index}"] = step_event
+
             # 发送步骤指令
             message = {
                 "type": "step",
@@ -108,12 +113,32 @@ class TaskScheduler:
                 "action": action,
                 **step  # 包含所有步骤参数
             }
-            
+
             await websocket.send_json(message)
-            
-            # 等待步骤完成（实际应该等待App的响应）
-            # 这里先简单延迟
-            await asyncio.sleep(2)
+
+            try:
+                await asyncio.wait_for(step_event.wait(), timeout=30)
+            except asyncio.TimeoutError:
+                print(f"⏰ 步骤执行超时: {task_id} step {index}")
+                self.handle_task_result(task_id, False, {
+                    "error": f"step {index} timeout",
+                    "step_index": index,
+                    "action": action
+                })
+                return
+            finally:
+                self.step_waiters.pop(f"{task_id}:{index}", None)
+
+            step_results = task.get('step_results', [])
+            latest_result = step_results[-1] if step_results else None
+            if latest_result and not latest_result.get('success', False):
+                print(f"❌ 步骤失败，终止任务: {task_id} step {index}")
+                self.handle_task_result(task_id, False, {
+                    "error": latest_result.get('message', 'step failed'),
+                    "step_index": index,
+                    "action": action
+                })
+                return
     
     async def execute_search_blogger(self, task: Dict, websocket):
         """执行搜索博主任务"""
@@ -148,6 +173,10 @@ class TaskScheduler:
             'timestamp': datetime.now().isoformat()
         })
         
+        waiter = self.step_waiters.get(f"{task_id}:{step_index}")
+        if waiter:
+            waiter.set()
+
         status = "✅" if success else "❌"
         print(f"{status} 步骤 {step_index}: {message}")
     
@@ -161,7 +190,11 @@ class TaskScheduler:
         task['status'] = 'completed' if success else 'failed'
         task['completed_at'] = datetime.now().isoformat()
         task['result'] = result or {}
-        
+
+        task_waiter = self.task_waiters.get(task_id)
+        if task_waiter:
+            task_waiter.set()
+
         # 从运行队列移除
         del self.running_tasks[task_id]
         

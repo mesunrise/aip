@@ -361,62 +361,101 @@ async def websocket_endpoint(websocket: WebSocket):
         print(f"📩 收到原始数据: {data}")
         message = json.loads(data)
         print(f"📦 解析后的消息: {message}")
-        
-        if message.get("type") == "register":
-            device_id = message.get("device_id", f"device_{len(connected_devices)}")
-            connected_devices[device_id] = websocket
-            device_info[device_id] = {
-                "connected_at": datetime.now().isoformat(),
-                "last_heartbeat": datetime.now().isoformat()
-            }
-            
-            print(f"✅ 设备已连接: {device_id}")
-            
-            # 发送连接成功消息
-            await websocket.send_text(json.dumps({
-                "type": "connected",
-                "device_id": device_id,
-                "message": "连接成功"
-            }))
-            
-            # 启动5秒延迟推送任务
-            asyncio.create_task(send_delayed_message())
-            
-            # 处理消息循环
-            while True:
-                data = await websocket.receive_text()
-                print(f"📩 [{device_id}] 收到原始数据: {data}")
-                message = json.loads(data)
-                print(f"📦 [{device_id}] 解析后的消息: {message}")
-                
-            if message.get("type") == "heartbeat":
-                # 心跳响应
+
+        if message.get("type") != "register":
+            await websocket.close(code=1008, reason="first message must be register")
+            print("⚠️ 首条消息不是 register，连接已关闭")
+            return
+
+        device_id = message.get("device_id", f"device_{len(connected_devices)}")
+        connected_devices[device_id] = websocket
+        device_info[device_id] = {
+            "connected_at": datetime.now().isoformat(),
+            "last_heartbeat": datetime.now().isoformat()
+        }
+
+        print(f"✅ 设备已连接: {device_id}")
+
+        # 发送连接成功消息
+        await websocket.send_text(json.dumps({
+            "type": "connected",
+            "device_id": device_id,
+            "message": "连接成功"
+        }))
+
+        # 启动5秒延迟推送任务
+        asyncio.create_task(send_delayed_message())
+
+        # 处理消息循环
+        while True:
+            data = await websocket.receive_text()
+            print(f"📩 [{device_id}] 收到原始数据: {data}")
+            message = json.loads(data)
+            print(f"📦 [{device_id}] 解析后的消息: {message}")
+
+            message_type = message.get("type")
+
+            if message_type == "heartbeat":
+                device_info[device_id]["last_heartbeat"] = datetime.now().isoformat()
                 await websocket.send_text(json.dumps({
                     "type": "heartbeat_ack",
                     "timestamp": datetime.now().isoformat()
                 }))
-                print(f"💓 心跳响应")
-                
-            elif message.get("type") == "message":
-                # 处理普通消息
+                print(f"💓 [{device_id}] 心跳响应")
+
+            elif message_type == "message":
                 content = message.get("content", "")
-                print(f"📨 收到消息: {content}")
-                
-                # 回复消息，回显收到的内容
+                print(f"📨 [{device_id}] 收到消息: {content}")
+
                 response = json.dumps({
                     "type": "message_ack",
                     "content": f"服务器收到: {content}",
                     "received_message": content,
                     "timestamp": datetime.now().isoformat()
                 })
-                print(f"📤 发送响应: {response}")
+                print(f"📤 [{device_id}] 发送响应: {response}")
                 await websocket.send_text(response)
-                print(f"✅ 响应已发送")
-                    
+                print(f"✅ [{device_id}] 响应已发送")
+
+            elif message_type == "start_task":
+                task = scheduler.get_next_task()
+                if task is None:
+                    print(f"⚠️ [{device_id}] 当前没有待执行任务")
+                    await websocket.send_text(json.dumps({
+                        "type": "no_task",
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                else:
+                    print(f"🚀 [{device_id}] 下发任务: {task.get('task_id')}")
+                    await scheduler.start_task(task, websocket)
+
+            elif message_type == "step_result":
+                task_id = message.get("task_id", "")
+                step_index = message.get("step_index", -1)
+                success = message.get("success", False)
+                result_message = message.get("message", "")
+                print(f"📋 [{device_id}] 步骤结果: task_id={task_id}, step_index={step_index}, success={success}, message={result_message}")
+                scheduler.handle_step_result(task_id, step_index, success, result_message)
+
+            elif message_type == "task_result":
+                task_id = message.get("task_id", "")
+                success = message.get("success", False)
+                result = message.get("result", {})
+                print(f"🏁 [{device_id}] 任务结果: task_id={task_id}, success={success}")
+                scheduler.handle_task_result(task_id, success, result)
+
+            else:
+                print(f"⚠️ [{device_id}] 未识别消息类型: {message_type}")
+
     except WebSocketDisconnect:
         print(f"❌ WebSocket连接已断开")
     except Exception as e:
         print(f"⚠️ 错误: {e}")
+    finally:
+        if device_id and connected_devices.get(device_id) is websocket:
+            connected_devices.pop(device_id, None)
+            device_info.pop(device_id, None)
+            print(f"🧹 已清理设备连接: {device_id}")
 
 if __name__ == "__main__":
     print("🚀 启动服务器...")

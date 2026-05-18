@@ -9,6 +9,7 @@ import com.douyin.automation.douyin.DouyinLauncher
 import com.douyin.automation.douyin.DouyinNavigator
 import com.douyin.automation.locator.ElementLocator
 import com.douyin.automation.logger.OperationLogger
+import com.douyin.automation.task.SearchAndExploreTask
 import com.douyin.automation.task.SearchBloggerTask
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +41,8 @@ class AutomationAccessibilityService : AccessibilityService() {
     private lateinit var douyinNavigator: DouyinNavigator
     private lateinit var operationLogger: OperationLogger
     
-    private var currentTask: SearchBloggerTask? = null
+    private var currentSearchTask: SearchBloggerTask? = null
+    private var currentSearchAndExploreTask: SearchAndExploreTask? = null
     private var wsClient: com.douyin.automation.network.WebSocketClient? = null
     
     /**
@@ -125,25 +127,24 @@ class AutomationAccessibilityService : AccessibilityService() {
     /**
      * 执行搜索博主任务
      */
-    fun executeSearchTask(bloggerName: String) {
-        Log.d(TAG, "🎯 开始执行搜索任务: $bloggerName")
-        
+    fun executeSearchTask(taskId: String, bloggerName: String) {
+        Log.d(TAG, "🎯 开始执行搜索任务: $taskId / $bloggerName")
+
+        cancelCurrentTask()
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 operationLogger.log("开始", "搜索博主: $bloggerName", true)
-                
-                // 创建任务
-                currentTask = SearchBloggerTask(
-                    service = this@AutomationAccessibilityService,
+
+                currentSearchTask = SearchBloggerTask(
                     launcher = douyinLauncher,
                     navigator = douyinNavigator,
                     logger = operationLogger,
                     wsClient = wsClient
                 )
-                
-                // 执行任务
-                val success = currentTask?.execute(bloggerName) ?: false
-                
+
+                val success = currentSearchTask?.execute(taskId, bloggerName) ?: false
+
                 if (success) {
                     Log.d(TAG, "✅ 搜索任务完成")
                     operationLogger.log("完成", "任务成功", true)
@@ -151,22 +152,78 @@ class AutomationAccessibilityService : AccessibilityService() {
                     Log.e(TAG, "❌ 搜索任务失败")
                     operationLogger.log("完成", "任务失败", false)
                 }
-                
+
             } catch (e: Exception) {
                 Log.e(TAG, "❌ 任务执行异常", e)
                 operationLogger.log("异常", "执行失败", false, e.message)
             } finally {
-                currentTask = null
+                currentSearchTask = null
             }
         }
     }
+
+    suspend fun searchKeyword(keyword: String): Boolean {
+        return douyinNavigator.searchKeyword(keyword)
+    }
+
+    suspend fun enterFirstVideoAuthor(): Boolean {
+        return douyinNavigator.enterFirstVideoAuthor()
+    }
+
+    suspend fun scrollProfile(scrollCount: Int): Boolean {
+        return douyinNavigator.scrollProfile(scrollCount)
+    }
+
+    suspend fun enterFirstVideo(): Boolean {
+        return douyinNavigator.enterFirstVideo()
+    }
+
+    suspend fun returnToAppHome(): Boolean {
+        return douyinNavigator.returnToAppHome()
+    }
     
     /**
-     * 取消当前任务
+     * 执行搜索并探索任务
      */
+    fun executeSearchAndExploreTask(taskId: String, keyword: String, scrollCount: Int = 3) {
+        Log.d(TAG, "🎯 开始执行搜索探索任务: $taskId / $keyword / scroll=$scrollCount")
+
+        cancelCurrentTask()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                operationLogger.log("开始", "搜索并探索: $keyword", true)
+
+                currentSearchAndExploreTask = SearchAndExploreTask(
+                    launcher = douyinLauncher,
+                    navigator = douyinNavigator,
+                    logger = operationLogger,
+                    wsClient = wsClient
+                )
+
+                val success = currentSearchAndExploreTask?.execute(taskId, keyword, scrollCount) ?: false
+
+                if (success) {
+                    Log.d(TAG, "✅ 搜索探索任务完成")
+                    operationLogger.log("完成", "任务成功", true)
+                } else {
+                    Log.e(TAG, "❌ 搜索探索任务失败")
+                    operationLogger.log("完成", "任务失败", false)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ 搜索探索任务执行异常", e)
+                operationLogger.log("异常", "执行失败", false, e.message)
+            } finally {
+                currentSearchAndExploreTask = null
+            }
+        }
+    }
+
     fun cancelCurrentTask() {
-        currentTask?.cancel()
-        currentTask = null
+        currentSearchTask?.cancel()
+        currentSearchAndExploreTask?.cancel()
+        currentSearchTask = null
+        currentSearchAndExploreTask = null
         Log.d(TAG, "🛑 任务已取消")
     }
     

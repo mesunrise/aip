@@ -278,6 +278,90 @@ class DouyinNavigator(
     }
     
     /**
+     * 搜索关键词
+     */
+    suspend fun searchKeyword(keyword: String): Boolean {
+        return searchBlogger(keyword)
+    }
+
+    /**
+     * 进入第一个作品的作者主页
+     */
+    suspend fun enterFirstVideoAuthor(): Boolean {
+        Log.d(TAG, "👤 尝试进入第一个作品的作者主页")
+        return clickFirstSearchResult()
+    }
+
+    /**
+     * 在主页滚动探索
+     */
+    suspend fun scrollProfile(scrollCount: Int): Boolean {
+        Log.d(TAG, "📜 开始滑动主页: $scrollCount 次")
+
+        val recyclerViews = locator.findByClassName(DouyinElements.RESULT_LIST_CLASS, timeout = 2000)
+        val scrollNode = recyclerViews.firstOrNull() ?: service.rootInActiveWindow
+
+        if (scrollNode == null) {
+            Log.e(TAG, "❌ 无法获取可滚动节点")
+            return false
+        }
+
+        repeat(scrollCount) { index ->
+            val success = AccessibilityHelper.scrollToBottom(scrollNode)
+            Log.d(TAG, "第 ${index + 1} 次滑动结果: $success")
+            if (!success) {
+                return index > 0
+            }
+            delay(1200)
+        }
+
+        return true
+    }
+
+    /**
+     * 进入主页中的第一个作品
+     */
+    suspend fun enterFirstVideo(): Boolean {
+        Log.d(TAG, "🎬 尝试进入第一个作品")
+
+        val profileIndicators = listOf(
+            DouyinElements.PROFILE_TAB_WORKS,
+            DouyinElements.PROFILE_TAB_LIKE,
+            DouyinElements.PROFILE_TAB_DYNAMIC
+        )
+
+        profileIndicators.forEach { locator.findByText(it, exact = false, timeout = 1000) }
+
+        val candidates = locator.findByClassName(DouyinElements.IMAGE_VIEW_CLASS, timeout = 2000)
+            .filter { it.isVisibleToUser }
+
+        for ((index, node) in candidates.withIndex()) {
+            Log.d(TAG, "尝试点击第 ${index + 1} 个作品候选节点")
+            if (AccessibilityHelper.clickNode(node)) {
+                delay(2500)
+                return true
+            }
+        }
+
+        Log.e(TAG, "❌ 未找到可进入的作品节点")
+        return false
+    }
+
+    /**
+     * 返回到App主界面
+     */
+    suspend fun returnToAppHome(): Boolean {
+        Log.d(TAG, "🏠 尝试返回抖音主界面")
+
+        repeat(3) {
+            goBack()
+            delay(1000)
+        }
+
+        return true
+    }
+
+    /**
      * 返回上一页
      */
     fun goBack(): Boolean {
