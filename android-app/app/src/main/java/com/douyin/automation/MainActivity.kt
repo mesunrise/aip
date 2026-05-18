@@ -172,10 +172,17 @@ class MainActivity : AppCompatActivity() {
      */
     private fun handleServerMessage(message: String) {
         try {
+            addLog("🔍 开始解析消息: ${message.take(100)}...")
             val json = JSONObject(message)
             val type = json.optString("type", "")
+            addLog("📋 消息类型: $type")
             
             when (type) {
+                "connected" -> {
+                    val deviceId = json.optString("device_id", "")
+                    addLog("✅ 连接确认: 设备ID = $deviceId")
+                }
+                
                 "task_start" -> {
                     val taskId = json.optString("task_id", "")
                     val taskName = json.optString("task_name", "")
@@ -208,9 +215,25 @@ class MainActivity : AppCompatActivity() {
                 "message_ack" -> {
                     addLog("✅ 服务器确认收到消息")
                 }
+                
+                "heartbeat_ack" -> {
+                    // 心跳响应，不记录日志避免刷屏
+                }
+                
+                "server_push" -> {
+                    val pushMessage = json.optString("message", "")
+                    addLog("📢 服务器推送: $pushMessage")
+                }
+                
+                else -> {
+                    addLog("⚠️ 未知消息类型: $type")
+                    addLog("📄 完整消息: $message")
+                }
             }
         } catch (e: Exception) {
             addLog("⚠️ 解析消息失败: ${e.message}")
+            addLog("📄 原始消息: $message")
+            e.printStackTrace()
         }
     }
     
@@ -218,11 +241,13 @@ class MainActivity : AppCompatActivity() {
      * 开始任务
      */
     private fun startTask() {
+        addLog("🔍 检查连接状态...")
         if (!::wsClient.isInitialized) {
-            addLog("❌ 请先连接服务器")
+            addLog("❌ WebSocket未初始化，请先连接服务器")
             return
         }
         
+        addLog("🔍 检查无障碍服务...")
         val service = AutomationAccessibilityService.getInstance()
         if (service == null) {
             addLog("❌ 无障碍服务未启动")
@@ -232,7 +257,14 @@ class MainActivity : AppCompatActivity() {
         
         addLog("🚀 请求开始任务...")
         val message = """{"type":"start_task"}"""
-        wsClient.sendRawMessage(message)
+        addLog("📤 发送消息: $message")
+        try {
+            wsClient.sendRawMessage(message)
+            addLog("✅ 消息已发送，等待服务器响应...")
+        } catch (e: Exception) {
+            addLog("❌ 发送失败: ${e.message}")
+            e.printStackTrace()
+        }
     }
     
     /**

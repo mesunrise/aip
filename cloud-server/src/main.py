@@ -5,7 +5,7 @@ from typing import Dict, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 import uvicorn
-from task_scheduler import TaskScheduler
+from src.task_scheduler import TaskScheduler
 
 app = FastAPI(title="抖音自动化云端服务器")
 
