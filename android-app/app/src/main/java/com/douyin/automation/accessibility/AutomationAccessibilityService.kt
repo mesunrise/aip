@@ -225,7 +225,7 @@ class AutomationAccessibilityService : AccessibilityService() {
     fun launchDouyin(): Boolean {
         return try {
             Log.d(TAG, "📱 启动抖音App")
-            douyinLauncher.launch()
+            douyinLauncher.launchDouyin()
         } catch (e: Exception) {
             Log.e(TAG, "❌ 启动抖音失败", e)
             false
